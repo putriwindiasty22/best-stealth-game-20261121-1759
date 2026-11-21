@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Night Shift at the Meridian Archive — a stealth game</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #0b0d16;
+    color: #e8e6df;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 12px;
+  }
+  #game-wrap { position: relative; width: 960px; max-width: 100%; }
+  canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: #14161f;
+    border: 2px solid #3b4257;
+    border-radius: 8px;
+    cursor: crosshair;
+  }
+  #hud {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    width: 960px;
+    max-width: 100%;
+    margin-bottom: 8px;
+    font-size: 14px;
+    flex-wrap: wrap;
+  }
+  #hud-level { font-weight: 700; color: #f5d76e; margin-right: auto; }
+  .hud-chip {
+    background: #1c2133;
+    border: 1px solid #3b4257;
+    border-radius: 6px;
+    padding: 4px 10px;
+    white-space: nowrap;
+  }
+  #hud-alert { display: flex; align-items: center; gap: 6px; }
+  #hud-alert-bar {
+    width: 120px;
+    height: 10px;
+    background: #10131f;
+    border: 1px solid #3b4257;
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  #hud-alert-fill { height: 100%; width: 0%; background: #facc15; transition: width 0.12s linear; }
+  #hud-alert-label { font-weight: 700; letter-spacing: 1px; font-size: 12px; }
+  #hud-message {
+    width: 960px;
+    max-width: 100%;
+    text-align: center;
+    min-height: 22px;
+    color: #a5f3d0;
+    font-size: 14px;
+    margin: 6px 0 0;
+  }
+  .hidden { display: none !important; }
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: rgba(8, 10, 18, 0.82);
+    border-radius: 8px;
+    padding: 32px;
+    z-index: 5;
+  }
+  .overlay h1 { margin: 0 0 8px; font-size: 42px; color: #f5d76e; letter-spacing: 1px; }
+  .overlay h2 { margin: 0 0 8px; font-size: 30px; color: #f5d76e; }
+  .overlay p { margin: 6px 0; max-width: 620px; line-height: 1.5; color: #d6d3c8; }
+  .overlay .sub { color: #9aa3b8; font-size: 14px; }
+  .overlay button {
+    margin-top: 18px;
+    font-size: 18px;
+    font-weight: 700;
+    padding: 12px 28px;
+    border: none;
+    border-radius: 8px;
+    background: #f5d76e;
+    color: #171208;
+    cursor: pointer;
+  }
+  .overlay button:hover { background: #ffe08a; }
+  .controls {
+    margin-top: 16px;
+    font-size: 13px;
+    color: #9aa3b8;
+    line-height: 1.7;
+    background: #141828;
+    border: 1px solid #2c3348;
+    border-radius: 8px;
+    padding: 10px 18px;
+  }
+  .controls b { color: #e8e6df; }
+  #mute-button {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 6;
+    background: #1c2133;
+    color: #e8e6df;
+    border: 1px solid #3b4257;
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  #footer { margin-top: 10px; font-size: 12px; color: #6b7280; text-align: center; }
+</style>
+</head>
+<body>
+  <div id="hud">
+    <span id="hud-level">Night Shift at the Meridian Archive</span>
+    <span class="hud-chip" id="hud-score">Score 0</span>
+    <span class="hud-chip" id="hud-time">00:00</span>
+    <span class="hud-chip" id="hud-intel">Intel 0/3</span>
+    <span class="hud-chip" id="hud-coins">Coins 5</span>
+    <span class="hud-chip" id="hud-alert"><span id="hud-alert-label">UNSEEN</span><span id="hud-alert-bar"><span id="hud-alert-fill"></span></span></span>
+  </div>
+
+  <div id="game-wrap">
+    <canvas id="game-canvas" width="960" height="640" role="img" aria-label="Top-down view of the Meridian Archive at night: a guard patrols with a yellow vision cone between crates, and the player sneaks toward glowing intel files"></canvas>
+    <noscript><p style="text-align:center">Night Shift at the Meridian Archive needs JavaScript to play.</p></noscript>
+    <button id="mute-button" type="button">Sound: on</button>
+
+    <div class="overlay" id="overlay-title">
+      <h1>NIGHT SHIFT</h1>
+      <h2>at the Meridian Archive</h2>
+      <p>You are Wren, an infiltrator in the city archive after dark. Lift every intel file, slip past the night watch, and leave through the green exit door — unseen.</p>
+      <p class="sub">Guards patrol with vision cones. Crates block their sight. Sneak with Shift, and click to toss a coin that draws a guard away. If a guard spots you, break line of sight and the alarm will fade.</p>
+      <button id="start-button" type="button">Begin the night — Enter</button>
+      <div class="controls">
+        <b>WASD / arrows</b> move &nbsp;·&nbsp; <b>Shift</b> sneak &nbsp;·&nbsp; <b>Click</b> toss a coin &nbsp;·&nbsp; <b>R</b> restart level &nbsp;·&nbsp; <b>M</b> mute &nbsp;·&nbsp; <b>Esc</b> pause
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="overlay-caught">
+      <h2>CAUGHT</h2>
+      <p>The night watch grabbed you under the lamps. The archive keeps its secrets — this time.</p>
+      <p id="caught-score">Score: 0</p>
+      <button id="caught-button" type="button">Try the level again — Enter</button>
+    </div>
+
+    <div class="overlay hidden" id="overlay-clear">
+      <h2>WING CLEARED</h2>
+      <p id="clear-stats"></p>
+      <p id="clear-score">Score: 0</p>
+      <button id="clear-button" type="button">Next level — Enter</button>
+    </div>
+
+    <div class="overlay hidden" id="overlay-win">
+      <h2>THE NIGHT IS YOURS</h2>
+      <p id="win-stats"></p>
+      <p id="win-score">Final score: 0</p>
+      <button id="win-button" type="button">Play again — Enter</button>
+    </div>
+
+    <div class="overlay hidden" id="overlay-pause">
+      <h2>PAUSED</h2>
+      <p>The archive waits in the dark.</p>
+      <button id="pause-button" type="button">Resume — Esc</button>
+    </div>
+  </div>
+
+  <p id="hud-message" class="hidden"></p>
+  <p id="footer">An original game — no assets borrowed from any other game. Runs entirely offline from these files.</p>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
